@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basketball Shot Form Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <header class="bg-blue-600 text-white py-6 shadow-md">
+        <div class="container mx-auto px-4">
+            <h1 class="text-3xl font-bold text-center">Basketball Shot Form Analyzer</h1>
+            <p class="text-center mt-2">Improve your shooting technique with AI-powered feedback</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 max-w-5xl">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4">How It Works</h2>
+            <ol class="list-decimal pl-6 space-y-2">
+                <li>Upload a short video clip (5-10 seconds) of your basketball shot from the side angle</li>
+                <li>Our AI analyzes your form using computer vision technology</li>
+                <li>Receive instant feedback on key aspects of your shooting technique</li>
+                <li>Compare your form with ideal shooting mechanics</li>
+            </ol>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Upload Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">Upload Your Shot</h2>
+                
+                <div id="upload-container" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <div id="upload-prompt">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p class="mt-2 text-gray-600">Drag and drop your video file here, or click to browse</p>
+                        <p class="mt-1 text-sm text-gray-500">MP4, MOV, or WEBM (max 50MB)</p>
+                        <button id="browse-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Browse Files</button>
+                    </div>
+                    
+                    <div id="upload-progress" class="hidden">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <p id="progress-text" class="mt-2 text-gray-600">Uploading: 0%</p>
+                    </div>
+
+                    <div id="upload-error" class="hidden">
+                        <svg class="mx-auto h-12 w-12 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <p id="error-message" class="mt-2 text-red-600">Error message will appear here</p>
+                        <button id="retry-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Try Again</button>
+                    </div>
+                </div>
+
+                <input type="file" id="file-input" class="hidden" accept="video/mp4,video/quicktime,video/webm">
+
+                <!-- Video Player -->
+                <div id="video-container" class="mt-6 hidden">
+                    <h3 class="font-semibold mb-2">Your Video</h3>
+                    <video id="video-player" class="w-full rounded-lg" controls></video>
+                    <div class="flex justify-between mt-2">
+                        <button id="analyze-btn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">Analyze Shot</button>
+                        <button id="clear-btn" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400">Clear Video</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">Analysis Results</h2>
+                
+                <div id="results-empty" class="text-center py-12">
+                    <svg class="mx-auto h-16 w-16 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="mt-2 text-gray-600">Upload and analyze a shot to see results</p>
+                </div>
+                
+                <div id="analyzing-spinner" class="hidden text-center py-12">
+                    <div class="spinner"></div>
+                    <p class="mt-4 text-gray-600">Analyzing your shot form...</p>
+                    <p class="mt-1 text-sm text-gray-500">This may take a moment</p>
+                </div>
+                
+                <div id="results-content" class="hidden">
+                    <!-- Visualization Canvas -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold mb-2">Shot Visualization</h3>
+                        <canvas id="visualization-canvas" class="w-full border rounded-lg"></canvas>
+                    </div>
+                    
+                    <!-- Score Summary -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold mb-2">Overall Form Score</h3>
+                        <div class="flex items-center">
+                            <div id="overall-score" class="text-3xl font-bold text-blue-600">0%</div>
+                            <div id="score-description" class="ml-4 text-gray-600">Upload a shot to see your score</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Detailed Metrics -->
+                    <div>
+                        <h3 class="font-semibold mb-2">Form Analysis</h3>
+                        <div class="space-y-4">
+                            <!-- Elbow Angle -->
+                            <div class="metric-container">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="font-medium">Elbow Angle</span>
+                                    <span id="elbow-angle-value" class="text-blue-600 font-medium">N/A</span>
+                                </div>
+                                <div class="h-2 bg-gray-200 rounded-full">
+                                    <div id="elbow-angle-bar" class="h-2 bg-blue-600 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <p id="elbow-angle-feedback" class="text-sm text-gray-600 mt-1">Ideal elbow angle is around 90°</p>
+                            </div>
+                            
+                            <!-- Release Point -->
+                            <div class="metric-container">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="font-medium">Release Point</span>
+                                    <span id="release-point-value" class="text-blue-600 font-medium">N/A</span>
+                                </div>
+                                <div class="h-2 bg-gray-200 rounded-full">
+                                    <div id="release-point-bar" class="h-2 bg-blue-600 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <p id="release-point-feedback" class="text-sm text-gray-600 mt-1">Ideal release point is at the peak of your jump</p>
+                            </div>
+                            
+                            <!-- Knee Bend -->
+                            <div class="metric-container">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="font-medium">Knee Bend</span>
+                                    <span id="knee-bend-value" class="text-blue-600 font-medium">N/A</span>
+                                </div>
+                                <div class="h-2 bg-gray-200 rounded-full">
+                                    <div id="knee-bend-bar" class="h-2 bg-blue-600 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <p id="knee-bend-feedback" class="text-sm text-gray-600 mt-1">Good knee bend helps with power transfer</p>
+                            </div>
+                            
+                            <!-- Balance & Alignment -->
+                            <div class="metric-container">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="font-medium">Balance & Alignment</span>
+                                    <span id="alignment-value" class="text-blue-600 font-medium">N/A</span>
+                                </div>
+                                <div class="h-2 bg-gray-200 rounded-full">
+                                    <div id="alignment-bar" class="h-2 bg-blue-600 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <p id="alignment-feedback" class="text-sm text-gray-600 mt-1">Good alignment keeps shot trajectory consistent</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Shooting Tips -->
+                    <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                        <h3 class="font-semibold mb-2">Personalized Tips</h3>
+                        <ul id="tips-list" class="list-disc pl-5 space-y-1 text-gray-700">
+                            <li>Upload a shot to receive personalized shooting tips</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p>&copy; 2025 Basketball Shot Form Analyzer</p>
+            <p class="mt-1 text-sm text-gray-400">Powered by TensorFlow.js and PoseNet</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
